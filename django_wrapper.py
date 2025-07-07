@@ -97,23 +97,38 @@ def configure_settings(app_name, settings_path, use_templates_and_static):
 
     updated = False
 
+    # Add 'import os' if it's not present
     if "import os" not in content:
         content = "import os\n" + content
         updated = True
 
+    # Add BASE_DIR if it's not present
     if "BASE_DIR = " not in content:
         base_dir_line = "BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))\n"
         content = content.replace("import os", f"import os\n{base_dir_line}")
         updated = True
 
+    # Add the app to INSTALLED_APPS if it's not already there
     if app_name not in content:
-        content = content.replace(
-            "INSTALLED_APPS = [",
-            f"INSTALLED_APPS = [\n    '{app_name}',"
-        )
-        updated = True
+        installed_apps_index = content.find("INSTALLED_APPS = [")
+        if installed_apps_index != -1:
+            before_apps = content[:installed_apps_index]
+            after_apps = content[installed_apps_index:]
+            
+            # Ensure app name is added to INSTALLED_APPS
+            after_apps = after_apps.replace(
+                "INSTALLED_APPS = [",
+                f"INSTALLED_APPS = [\n    '{app_name}',"
+            )
+            content = before_apps + after_apps
+            updated = True
+        else:
+            # In case INSTALLED_APPS doesn't exist (very unlikely)
+            content += f"\nINSTALLED_APPS = [\n    '{app_name}',\n]\n"
+            updated = True
 
     if use_templates_and_static:
+        # Add template and static setup if required
         def update_templates_dirs_block(content):
             pattern = r"'DIRS'\s*:\s*\[(.*?)\]"
             match = re.search(pattern, content, re.DOTALL)
@@ -137,8 +152,10 @@ def configure_settings(app_name, settings_path, use_templates_and_static):
             content += "\nSTATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')\n"
             updated = True
 
-    with open(settings_path, "w") as f:
-        f.write(content)
+    if updated:
+        with open(settings_path, "w") as f:
+            f.write(content)
+
 
 def create_global_static_and_template_dirs(project_dir):
     static_dir = os.path.join(project_dir, "static")
